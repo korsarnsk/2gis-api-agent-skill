@@ -1,0 +1,285 @@
+{
+  "name": "2gis-api-tools",
+  "version": "1.0.0",
+  "description": "Tools для работы с публичными API 2ГИС через Hermes Agent",
+  "configuration": {
+    "api_key": {
+      "type": "string",
+      "description": "API-ключ 2ГИС (получить на https://platform.2gis.com/)",
+      "required": true,
+      "env_var": "TWOGIS_API_KEY"
+    }
+  },
+  "tools": [
+    {
+      "name": "twogis_search_places",
+      "description": "Поиск организаций, зданий и мест в каталоге 2ГИС. Используй для нахождения компаний, ресторанов, магазинов, адресов, остановок, парковок.",
+      "parameters": {
+        "type": "object",
+        "required": ["query"],
+        "properties": {
+          "query": {"type": "string", "description": "Текст поискового запроса (напр. 'кофейня', 'Сбербанк', 'аптека 24 часа')"},
+          "lon": {"type": "number", "description": "Долгота центра поиска"},
+          "lat": {"type": "number", "description": "Широта центра поиска"},
+          "radius": {"type": "integer", "description": "Радиус поиска в метрах (макс. 50000)", "default": 1000},
+          "type": {"type": "string", "enum": ["branch", "building", "street", "adm_div", "station", "parking", "gate", "road", "attraction", "crossroad"], "description": "Фильтр по типу объекта"},
+          "page_size": {"type": "integer", "description": "Кол-во результатов (1-50)", "default": 10},
+          "fields": {"type": "string", "description": "Доп. поля через запятую", "default": "items.point,items.address"}
+        }
+      },
+      "api": "places",
+      "build_params": "GET: q=query, point=lon,lat, radius, type, page_size, fields"
+    },
+    {
+      "name": "twogis_get_item",
+      "description": "Получить полную информацию об объекте 2ГИС по его ID. Используй после поиска для получения детальных данных.",
+      "parameters": {
+        "type": "object",
+        "required": ["id"],
+        "properties": {
+          "id": {"type": "string", "description": "ID объекта из каталога 2ГИС"},
+          "fields": {"type": "string", "description": "Доп. поля", "default": "items.point,items.address,items.contact_groups,items.schedule,items.links,items.reviews"}
+        }
+      },
+      "api": "byid"
+    },
+    {
+      "name": "twogis_geocode",
+      "description": "Геокодирование: преобразование адреса в координаты (прямое) или координат в адрес (обратное).",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "address": {"type": "string", "description": "Адрес для прямого геокодирования (напр. 'Москва, Тверская, 1')"},
+          "lat": {"type": "number", "description": "Широта для обратного геокодирования"},
+          "lon": {"type": "number", "description": "Долгота для обратного геокодирования"},
+          "fields": {"type": "string", "default": "items.point,items.address"}
+        }
+      },
+      "api": "geocode",
+      "build_params": "GET: q=address OR lat+lon, fields"
+    },
+    {
+      "name": "twogis_suggest",
+      "description": "Автодополнение — получить подсказки по частичному тексту ввода. Для интерактивного поиска.",
+      "parameters": {
+        "type": "object",
+        "required": ["query"],
+        "properties": {
+          "query": {"type": "string", "description": "Частичный текст запроса"},
+          "lon": {"type": "number", "description": "Долгота для контекста"},
+          "lat": {"type": "number", "description": "Широта для контекста"},
+          "suggest_type": {"type": "string", "enum": ["default", "route_endpoint"], "default": "default"}
+        }
+      },
+      "api": "suggest"
+    },
+    {
+      "name": "twogis_get_regions",
+      "description": "Получить список регионов (агломераций) 2ГИС. Используй для получения region_id перед поиском.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "query": {"type": "string", "description": "Фильтр по названию региона"}
+        }
+      },
+      "api": "regions"
+    },
+    {
+      "name": "twogis_build_route",
+      "description": "Построить маршрут между точками. Поддерживает авто, пешеход, велосипед, такси, скутер, грузовик.",
+      "parameters": {
+        "type": "object",
+        "required": ["points"],
+        "properties": {
+          "points": {
+            "type": "array",
+            "description": "Массив точек маршрута",
+            "items": {
+              "type": "object",
+              "required": ["x", "y"],
+              "properties": {
+                "type": {"type": "string", "enum": ["walking", "stop", "pref"], "default": "walking", "description": "walking=пешеходный подход, stop=точка маршрута, pref=промежуточная"},
+                "x": {"type": "number", "description": "Долгота"},
+                "y": {"type": "number", "description": "Широта"}
+              }
+            }
+          },
+          "route_type": {"type": "string", "enum": ["jam", "statistic", "shortest", "pedestrian", "bicycle", "taxi", "emergency", "truck_jam", "truck_statistic"], "default": "jam", "description": "Тип маршрута"},
+          "locale": {"type": "string", "default": "ru"},
+          "alternative": {"type": "integer", "description": "Кол-во альтернативных маршрутов (до 3)"}
+        }
+      },
+      "api": "routing"
+    },
+    {
+      "name": "twogis_public_transport",
+      "description": "Построить маршрут на общественном транспорте (автобус, трамвай, троллейбус, метро и др.).",
+      "parameters": {
+        "type": "object",
+        "required": ["source_lat", "source_lon", "target_lat", "target_lon"],
+        "properties": {
+          "source_lat": {"type": "number", "description": "Широта начала"},
+          "source_lon": {"type": "number", "description": "Долгота начала"},
+          "target_lat": {"type": "number", "description": "Широта конца"},
+          "target_lon": {"type": "number", "description": "Долгота конца"},
+          "transport": {
+            "type": "array",
+            "items": {"type": "string", "enum": ["bus", "trolleybus", "tram", "metro", "light_metro", "suburban_train", "funicular", "monorail", "water_transport"]},
+            "default": ["bus", "trolleybus", "tram", "metro"]
+          }
+        }
+      },
+      "api": "public_transport"
+    },
+    {
+      "name": "twogis_distance_matrix",
+      "description": "Рассчитать матрицу расстояний и времени между точками. Для логистики и сравнения маршрутов.",
+      "parameters": {
+        "type": "object",
+        "required": ["points", "sources", "targets"],
+        "properties": {
+          "points": {
+            "type": "array",
+            "description": "Все точки",
+            "items": {"type": "object", "required": ["lat", "lon"], "properties": {"lat": {"type": "number"}, "lon": {"type": "number"}}}
+          },
+          "sources": {"type": "array", "items": {"type": "integer"}, "description": "Индексы начальных точек"},
+          "targets": {"type": "array", "items": {"type": "integer"}, "description": "Индексы конечных точек"},
+          "type": {"type": "string", "enum": ["jam", "statistic", "shortest"], "default": "jam"}
+        }
+      },
+      "api": "dist_matrix"
+    },
+    {
+      "name": "twogis_isochrone",
+      "description": "Построить зоны доступности (изохроны) — территории, достижимые за указанное время от/к точке.",
+      "parameters": {
+        "type": "object",
+        "required": ["lat", "lon", "durations"],
+        "properties": {
+          "lat": {"type": "number", "description": "Широта центра"},
+          "lon": {"type": "number", "description": "Долгота центра"},
+          "durations": {"type": "array", "items": {"type": "integer"}, "description": "Длительности в секундах (макс. 5 значений, каждое до 3600)"},
+          "transport": {"type": "string", "enum": ["driving", "walking", "bicycle", "public_transport", "taxi"], "default": "driving"},
+          "reverse": {"type": "boolean", "default": false, "description": "false=от точки, true=к точке"}
+        }
+      },
+      "api": "isochrone"
+    },
+    {
+      "name": "twogis_tsp_create",
+      "description": "Создать задачу коммивояжёра (TSP/VRP) — оптимальный обход точек курьерами. Возвращает task_id.",
+      "parameters": {
+        "type": "object",
+        "required": ["waypoints", "agents"],
+        "properties": {
+          "start_time": {"type": "string", "description": "Время старта в ISO 8601 (напр. '2025-06-01T08:00:00Z')"},
+          "agents": {
+            "type": "array",
+            "description": "Массив курьеров",
+            "items": {
+              "type": "object",
+              "required": ["agent_id", "start_waypoint_id"],
+              "properties": {
+                "agent_id": {"type": "integer"},
+                "start_waypoint_id": {"type": "integer"},
+                "work_time_window": {"type": "object", "properties": {"start": {"type": "integer"}, "end": {"type": "integer"}}},
+                "capacity": {"type": "integer"}
+              }
+            }
+          },
+          "waypoints": {
+            "type": "array",
+            "description": "Массив точек",
+            "items": {
+              "type": "object",
+              "required": ["waypoint_id", "point"],
+              "properties": {
+                "waypoint_id": {"type": "integer"},
+                "point": {"type": "object", "required": ["lat", "lon"], "properties": {"lat": {"type": "number"}, "lon": {"type": "number"}}},
+                "service_time": {"type": "integer", "description": "Время обслуживания в секундах"},
+                "delivery_value": {"type": "integer", "description": "Вес/объём доставки"}
+              }
+            }
+          },
+          "transport": {"type": "string", "enum": ["driving", "walking", "bicycle", "scooter", "truck"], "default": "driving"}
+        }
+      },
+      "api": "tsp_create"
+    },
+    {
+      "name": "twogis_tsp_status",
+      "description": "Проверить статус задачи TSP/VRP по task_id.",
+      "parameters": {
+        "type": "object",
+        "required": ["task_id"],
+        "properties": {
+          "task_id": {"type": "string", "description": "ID задачи из tsp_create"}
+        }
+      },
+      "api": "tsp_status"
+    },
+    {
+      "name": "twogis_tsp_result",
+      "description": "Получить результат решённой задачи TSP/VRP.",
+      "parameters": {
+        "type": "object",
+        "required": ["task_id"],
+        "properties": {
+          "task_id": {"type": "string", "description": "ID задачи"}
+        }
+      },
+      "api": "tsp_result"
+    },
+    {
+      "name": "twogis_map_matching",
+      "description": "Привязать GPS-трек к дорожной сети. Восстановить маршрут из записанных точек.",
+      "parameters": {
+        "type": "object",
+        "required": ["track_points"],
+        "properties": {
+          "track_points": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["lon", "lat", "utc"],
+              "properties": {
+                "lon": {"type": "number"},
+                "lat": {"type": "number"},
+                "utc": {"type": "integer", "description": "Unix timestamp"},
+                "speed": {"type": "number", "description": "Скорость км/ч"},
+                "azimuth": {"type": "number", "description": "Азимут в градусах"}
+              }
+            }
+          }
+        }
+      },
+      "api": "map_matching"
+    },
+    {
+      "name": "twogis_truck_passes",
+      "description": "Получить список зон пропусков для грузовиков. Используй ID пропусков при построении грузовых маршрутов.",
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      },
+      "api": "truck_passes"
+    },
+    {
+      "name": "twogis_static_map",
+      "description": "Получить статичное PNG-изображение карты по координатам и масштабу.",
+      "parameters": {
+        "type": "object",
+        "required": ["center_lon", "center_lat", "zoom"],
+        "properties": {
+          "center_lon": {"type": "number", "description": "Долгота центра"},
+          "center_lat": {"type": "number", "description": "Широта центра"},
+          "zoom": {"type": "integer", "description": "Масштаб 1-18", "default": 14},
+          "width": {"type": "integer", "default": 600},
+          "height": {"type": "integer", "default": 400}
+        }
+      },
+      "api": "static_map"
+    }
+  ]
+}
